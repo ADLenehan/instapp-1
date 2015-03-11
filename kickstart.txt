@@ -1,0 +1,102 @@
+#
+# Before you can run this script
+#
+
+# Enable the network interface (the file ifcfg-enp0s3 might be named differently)
+sed -i -e s/ONBOOT=no/ONBOOT=yes/ /etc/sysconfig/network-scripts/ifcfg-enp0s3
+service network restart
+
+# So you can see the assigned IP and SSH with putty or something
+ip addr
+
+########################
+# The kickstart script #
+########################
+
+#
+# Firewall rules
+#
+
+firewall-cmd --permanent --add-port=22/tcp
+firewall-cmd --permanent --add-port=80/tcp
+firewall-cmd --permanent --add-port=137/tcp
+firewall-cmd --permanent --add-port=138/tcp
+firewall-cmd --permanent --add-port=139/tcp
+firewall-cmd --permanent --add-port=445/tcp
+firewall-cmd --permanent --add-port=901/tcp
+firewall-cmd --permanent --add-port=5432/tcp
+firewall-cmd --reload
+
+#
+# Install Software
+#
+
+yum -y update
+yum install -y epel-release
+yum install -y vim python-devel python-pip python-psycopg2 httpd samba samba-client mod_wsgi gcc ntpdate npm git ntp
+
+pip install Django python-oauth2 pytz boto django-storages python-dateutil pillow django-ses django-pipeline awscli awsebcli python-instagram
+
+npm -g install yuglify
+
+#
+# Install postgresql
+#
+
+rpm -Uvh http://yum.postgresql.org/9.3/redhat/rhel-7-x86_64/pgdg-centos93-9.3-1.noarch.rpm
+yum install -y postgresql93 postgresql93-server postgresql93-contrib
+su - postgres -c /usr/pgsql-9.3/bin/initdb
+
+echo "listen_addresses = '*'" >> /var/lib/pgsql/9.3/data/postgresql.conf
+echo "port = 5432" >> /var/lib/pgsql/9.3/data/postgresql.conf
+echo "host    all             all             0.0.0.0/0               trust" >> /var/lib/pgsql/9.3/data/pg_hba.conf
+
+systemctl start postgresql-9.3.service
+systemctl enable postgresql-9.3.service
+
+psql -U postgres -c "CREATE ROLE root WITH SUPERUSER LOGIN PASSWORD 'password'"
+createdb InstApp
+
+#
+# Configure Apache
+#
+
+rm -f /etc/httpd/conf.d/autoindex.conf
+rm -f /etc/httpd/conf.d/README
+rm -f /etc/httpd/conf.d/userdir.conf
+rm -f /etc/httpd/conf.d/welcome.conf
+
+
+touch /etc/httpd/conf.d/instapp.conf
+echo '<VirtualHost *:80>' >> /etc/httpd/conf.d/instapp.conf
+echo '    WSGIDaemonProcess instapp python-path=/var/www/instapp' >> /etc/httpd/conf.d/instapp.conf
+echo '    WSGIProcessGroup instapp' >> /etc/httpd/conf.d/instapp.conf
+echo '    WSGIScriptAlias / /var/www/instapp/app/wsgi.py' >> /etc/httpd/conf.d/instapp.conf
+echo '    <Directory /var/www/instapp>' >> /etc/httpd/conf.d/instapp.conf
+echo '        Require all granted' >> /etc/httpd/conf.d/instapp.conf
+echo '    </Directory>' >> /etc/httpd/conf.d/instapp.conf
+echo '</VirtualHost>' >> /etc/httpd/conf.d/instapp.conf
+
+systemctl start httpd.service
+systemctl enable httpd.service
+
+#
+# Configure samba
+#
+
+
+smbpasswd -a root
+#set samba pw: 'password'
+
+echo "[www]" >> /etc/samba/smb.conf
+echo "       comment = Web Root" >> /etc/samba/smb.conf
+echo "       path = /var/www" >> /etc/samba/smb.conf
+echo "       valid users = root" >> /etc/samba/smb.conf
+echo "       writable = yes" >> /etc/samba/smb.conf
+echo "       printable = no" >> /etc/samba/smb.conf
+
+systemctl start smb
+systemctl enable smb.service
+
+sed -i 's/enforcing/disabled/g' /etc/selinux/config /etc/selinux/config
+shutdown -r now
