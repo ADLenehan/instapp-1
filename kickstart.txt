@@ -1,4 +1,9 @@
 #
+#
+#
+
+
+#
 # Before you can run this script
 #
 
@@ -72,6 +77,7 @@ echo '<VirtualHost *:80>' >> /etc/httpd/conf.d/instapp.conf
 echo '    WSGIDaemonProcess instapp python-path=/var/www/instapp' >> /etc/httpd/conf.d/instapp.conf
 echo '    WSGIProcessGroup instapp' >> /etc/httpd/conf.d/instapp.conf
 echo '    WSGIScriptAlias / /var/www/instapp/app/wsgi.py' >> /etc/httpd/conf.d/instapp.conf
+echo '    Alias /static /var/www/instapp/static' >> /etc/httpd/conf.d/instapp.conf
 echo '    <Directory /var/www/instapp>' >> /etc/httpd/conf.d/instapp.conf
 echo '        Require all granted' >> /etc/httpd/conf.d/instapp.conf
 echo '    </Directory>' >> /etc/httpd/conf.d/instapp.conf
